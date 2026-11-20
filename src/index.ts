@@ -1,0 +1,210 @@
+/**
+ * `@codetta/annotations`: the annotation model shared by the app and the web
+ * (ADR-008). Pure TypeScript: no React, no Node APIs; the UI-thread parts are worklets.
+ */
+export { type AnchorResolver, pageAnchorResolver } from './anchor';
+export { decodeBase64url, encodeBase64url } from './codec/base64url';
+export {
+  decodePoints,
+  type DecodePointsResult,
+  encodePoints,
+  MAX_ENCODED_POINTS_LENGTH,
+  POINTS_FORMAT_VERSION,
+  PointsDecoder,
+} from './codec/points-codec';
+export {
+  MIN_SHAPE_LENGTH,
+  shapeFromDrag,
+  type ShapeKind,
+  SLUR_BULGE,
+} from './geometry/drag-shapes';
+export {
+  applyToPoint,
+  chain,
+  IDENTITY,
+  invert,
+  type Matrix,
+  multiply,
+  scaling,
+  toSkiaMatrix,
+  translation,
+} from './geometry/matrix';
+export {
+  DEFAULT_MEDIA_BOX,
+  normalizedToPdf,
+  OUTLINE_SCALE,
+  type PageFrame,
+  pageFrame,
+  type PdfBox,
+  type QuarterTurn,
+  quarterTurn,
+  unitSquareTurn,
+} from './geometry/page-frame';
+export { type ShapePolylines, shapePolylines, SLUR_SEGMENTS } from './geometry/shapes';
+export { STAMP_EM_PER_BOX, TEXT_BASELINE, TEXT_LINE_HEIGHT } from './geometry/text-and-stamps';
+export {
+  FULL_PAGE,
+  type NormalizedRect,
+  normalizedToView,
+  type View,
+  type ViewInput,
+  viewToNormalized,
+  viewTransform,
+} from './geometry/view';
+export {
+  canRedo,
+  canUndo,
+  type Command,
+  type CurrentRow,
+  EMPTY_HISTORY,
+  type GetCurrentRow,
+  type History,
+  type HistoryRow,
+  type HistoryTable,
+  type Mutation,
+  nextRedoPage,
+  nextUndoPage,
+  record,
+  redo,
+  sameValue,
+  type StepResult,
+  undo,
+} from './history/history';
+export {
+  erasableOn,
+  eraseHits,
+  eraserTouches,
+  type HitTarget,
+  hitTarget,
+  type HitTestOptions,
+  segmentDistance2,
+} from './hit-test/eraser';
+export { pageFromCache, PageJob, POINTS_PER_STEP, type RowRef } from './page/page-job';
+export {
+  type PreparationTimings,
+  type PreparedAnnotation,
+  PreparedCache,
+  preparedFinishedStroke,
+  type PreparedPage,
+  preparePage,
+} from './page/prepare-page';
+export {
+  countPaintOps,
+  type HighlightGroup,
+  highlightGroups,
+  type PaintOp,
+  paintPage,
+  type PaintPath,
+  parsePdfPath,
+  PATH_CLOSE,
+  PATH_CUBIC,
+  PATH_LINE,
+  PATH_MOVE,
+  smuflGlyphPath,
+} from './paint/paint-page';
+export {
+  COORDINATE_STEPS,
+  MAX_POINT_TIME_MS,
+  MAX_STROKE_POINTS,
+  NO_PRESSURE,
+  type Point,
+  POINT_STRIDE,
+  type PointBuffer,
+  pointCount,
+  PRESSURE_STEPS,
+  quantizeCoordinate,
+  quantizePoint,
+  quantizePressure,
+  quantizeTime,
+  toPointBuffer,
+  toPoints,
+} from './points';
+export {
+  type Anchor,
+  AnchorSchema,
+  ANNOTATION_TYPES,
+  type AnnotationType,
+  DATA_SCHEMAS,
+  DATA_VERSION,
+  type FreehandData,
+  type HighlightData,
+  HighlightDataSchema,
+  isSupportedType,
+  type NormalizedPoint,
+  NormalizedPointSchema,
+  NormalizedSchema,
+  PointsSchema,
+  type ShapeData,
+  ShapeDataSchema,
+  type StampData,
+  StampDataSchema,
+  type StrokeData,
+  StrokeDataSchema,
+  StrokeWidthSchema,
+  type SupportedType,
+  type TextData,
+  TextDataSchema,
+} from './schema/data';
+export {
+  HIGHLIGHTER_INKS,
+  type HighlighterInk,
+  highlighterInkColor,
+  HighlighterInkSchema,
+  PEN_INKS,
+  type PenInk,
+  penInkColor,
+  PenInkSchema,
+} from './schema/ink';
+export {
+  type Annotation,
+  type AnnotationRowBase,
+  type DeferredAnnotation,
+  type DeferredFreehand,
+  encodeAnnotationData,
+  LAYER_KINDS,
+  LAYER_PURPOSES,
+  type LayerRow,
+  LayerRowSchema,
+  parseAnnotationHead,
+  parseAnnotationRow,
+  parseAnnotationRowDeferred,
+  type ParsedAnnotation,
+  parseLayerRow,
+  type UnsupportedReason,
+} from './schema/rows';
+export {
+  addInputPoint,
+  createOutlineBuilder,
+  type OutlineBuilder,
+  type OutlineOptions,
+  type OutlineParts,
+  outlineParts,
+  outlinePolygon,
+  tailPolygon,
+  takeCommittedChunks,
+} from './smoothing/outline';
+export {
+  addSample,
+  capturedPoints,
+  createStrokeCapture,
+  finishStroke,
+  freehandOutline,
+  type FreehandStyle,
+  MIN_SAMPLE_DISTANCE,
+  outlineOptions,
+  type SampleResult,
+  type StrokeCapture,
+} from './smoothing/stroke';
+export {
+  SMUFL_GLYPH_NAMES,
+  SMUFL_GLYPHS,
+  smuflCharacter,
+  type SmuflGlyph,
+  STAMP_BASE_SIZE,
+  STAMP_CATEGORIES,
+  STAMP_SYMBOLS,
+  type StampRef,
+  type StampSymbol,
+  type StampSymbolDrawing,
+  stampSymbolDrawing,
+} from './stamps/catalog';

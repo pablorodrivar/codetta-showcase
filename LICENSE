@@ -1,0 +1,9 @@
+Copyright © 2026 Pablo Rodríguez Vargas. All rights reserved.
+
+This repository is published for viewing only. No permission is granted to use, copy, modify or distribute the code or documentation, in whole or in part, without prior written permission.
+
+Third-party material keeps its own license:
+
+- fonts/bravura/Bravura.otf, and the glyph outlines derived from it in src/stamps/generated/smufl-outlines.ts: Copyright © 2015, Steinberg Media Technologies GmbH, with Reserved Font Name "Bravura", under the SIL Open Font License 1.1 (fonts/bravura/OFL.txt).
+- fonts/inter/Inter-Regular.ttf: Copyright © 2016 The Inter Project Authors, under the SIL Open Font License 1.1 (fonts/inter/OFL.txt).
+- The PDFs in fixtures/: public domain or CC0, as fixtures/README.md details.
