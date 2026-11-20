@@ -1,0 +1,49 @@
+{
+  "name": "@codetta/annotations",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The annotation engine of Codetta, a sheet-music reader: normalized coordinates, stroke smoothing, point codec, chunked page preparation, eraser, undo history and annotated PDF export.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "packageManager": "pnpm@12.16.1",
+  "engines": {
+    "node": ">=24.0.0",
+    "pnpm": ">=12.0.0"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts",
+    "./bench": "./src/bench/index.ts",
+    "./pdf": "./src/pdf/index.ts",
+    "./bench/pdf": "./src/bench/pdf.ts",
+    "./pdf/content": "./src/pdf/content-entry.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc",
+    "test": "vitest run",
+    "generate": "vitest run src/stamps/smufl-outlines.test.ts --update=all",
+    "size-report": "vitest run --config vitest.report.config.ts scripts/size-report.ts",
+    "perf-report": "vitest run --config vitest.report.config.ts scripts/perf-report.ts",
+    "pdf-report": "vitest run --config vitest.report.config.ts scripts/pdf-report.ts",
+    "outline-golden": "vitest run --config vitest.report.config.ts scripts/outline-golden-report.ts"
+  },
+  "dependencies": {
+    "pako": "1.0.11",
+    "pdf-lib": "1.17.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@types/node": "24.19.2",
+    "@types/pako": "1.0.7",
+    "eslint": "9.39.5",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-simple-import-sort": "14.0.0",
+    "opentype.js": "2.0.0",
+    "perfect-freehand": "1.2.3",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1",
+    "vitest": "5.0.5"
+  }
+}

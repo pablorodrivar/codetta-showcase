@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig/library.json",
+  // No Node types for the shipped code: tests and scripts that need them reference them.
+  "include": ["src", "scripts", "*.ts"]
+}
