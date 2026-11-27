@@ -15,6 +15,8 @@ import {
   type OutlineOptions,
   outlineParts,
   outlinePolygon,
+  packOutlineParts,
+  tailPolygonOf,
 } from './outline';
 
 /** What decides how a freehand annotation looks: its type, input and width. */
@@ -161,6 +163,30 @@ export function finishStroke(
   const points = capturedPoints(capture);
   if (points.length === 0) return null;
   return { points, outline: outlinePolygon(outlineParts(capture.builder, true)) };
+}
+
+/**
+ * A stroke at pen up, as the app's reader takes it (ADR-008 §7, ADR-013 §5): the captured
+ * points; the finished outline's parts packed for the JS thread, which assembles the polygon a
+ * few points at a time (`FinishedStrokeJob`), so the UI runtime never assembles the polygon; and
+ * the tail still missing from the live path (what `takeCommittedChunks` has not handed out), to
+ * close it. Beyond the tail, it costs native copies only (`capturedPoints`, `packOutlineParts`).
+ * Null for a stroke with no points.
+ */
+export function finishStrokeParts(capture: StrokeCapture): {
+  readonly points: PointBuffer;
+  readonly parts: Float64Array;
+  readonly tail: number[];
+} | null {
+  'worklet';
+  const points = capturedPoints(capture);
+  if (points.length === 0) return null;
+  const parts = outlineParts(capture.builder, true);
+  return {
+    points,
+    parts: packOutlineParts(parts),
+    tail: tailPolygonOf(capture.builder, parts),
+  };
 }
 
 /**

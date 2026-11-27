@@ -15,8 +15,16 @@ This repository contains one piece of it, **the annotation engine** (`@codetta/a
 
 ## Where it fits
 
-```mermaid
-flowchart LR
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/where-it-fits.dark.svg" />
+  <img src="docs/diagrams/where-it-fits.light.svg" alt="Architecture diagram. On the tablet, which works fully offline, the Expo and React Native mobile app uses native modules (score renderer, PDF import and validation, key events), react-native-skia for the annotation layer, a local SQLite database with the PowerSync client and PDF files in app storage. The mobile app and the Next.js web app both use the shared TypeScript packages: core, annotations (this repository), sync, i18n and design tokens. After 1.0, the local database syncs through PowerSync with Supabase, and the PDF files go to Cloudflare R2 through presigned URLs." />
+</picture>
+
+<details>
+<summary>Diagram source</summary>
+
+```text
+flowchart TB
   subgraph device["Tablet: works fully offline"]
     mobile["Mobile app<br/>Expo · React Native"]
     subgraph native["Native modules (Swift / Kotlin)"]
@@ -24,24 +32,24 @@ flowchart LR
       files["Score files<br/>PDF import and validation"]
       keys["Key events<br/>keyboards and pedals"]
     end
-    skia["react-native-skia<br/>annotation layer"]
-    db[("Local SQLite<br/>PowerSync client")]
     pdfs[("PDF files<br/>app storage")]
-  end
-
-  subgraph shared["Shared TypeScript packages"]
-    core["Core<br/>domain · Zod"]
-    annotations["<b>Annotations</b><br/>this repository"]
-    sync["Sync"]
-    ui["i18n · design tokens"]
+    db[("Local SQLite<br/>PowerSync client")]
+    skia["react-native-skia<br/>annotation layer"]
   end
 
   web["Web app<br/>Next.js on Cloudflare Workers"]
 
+  subgraph shared["Shared TypeScript packages"]
+    core["Core<br/>domain · Zod"]
+    annotations["Annotations<br/>this repository"]
+    sync["Sync"]
+    ui["i18n · design tokens"]
+  end
+
   subgraph cloud["Backend: account and sync arrive after 1.0"]
     supabase[("Supabase<br/>Postgres + RLS · Auth")]
-    powersync["PowerSync Service"]
     r2[("Cloudflare R2<br/>presigned URLs")]
+    powersync["PowerSync Service"]
   end
 
   mobile --> renderer & files & keys
@@ -57,8 +65,19 @@ flowchart LR
   pdfs <-.->|upload / download| r2
   web -.-> supabase
 
+  %% Layout only: invisible links (~~~) that stack the boxes in a narrow column, so the
+  %% diagram stays readable on a phone. They draw nothing and mean nothing.
+  keys ~~~ files
+  files ~~~ renderer
+  skia ~~~ db
+  powersync ~~~ web
+  core ~~~ annotations
+  annotations ~~~ sync
+  sync ~~~ ui
   style annotations stroke-width:3px
 ```
+
+</details>
 
 The product rules that shape this package:
 

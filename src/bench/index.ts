@@ -14,6 +14,7 @@ export {
   busyPageRows,
   calibrationLine,
   calibrationWork,
+  finishedStrokeInput,
   formatMs,
   liveInput,
   longStrokePageRows,
@@ -24,4 +25,4 @@ export {
   WARMUP,
   workletInputs,
 } from './cases';
-export { finishedOutlineSamples, liveEventSamples } from './live';
+export { finishedOutlineSamples, finishSamples, liveEventSamples } from './live';

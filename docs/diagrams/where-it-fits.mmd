@@ -1,0 +1,51 @@
+flowchart TB
+  subgraph device["Tablet: works fully offline"]
+    mobile["Mobile app<br/>Expo · React Native"]
+    subgraph native["Native modules (Swift / Kotlin)"]
+      renderer["Score renderer<br/>PDFKit / PdfRenderer"]
+      files["Score files<br/>PDF import and validation"]
+      keys["Key events<br/>keyboards and pedals"]
+    end
+    pdfs[("PDF files<br/>app storage")]
+    db[("Local SQLite<br/>PowerSync client")]
+    skia["react-native-skia<br/>annotation layer"]
+  end
+
+  web["Web app<br/>Next.js on Cloudflare Workers"]
+
+  subgraph shared["Shared TypeScript packages"]
+    core["Core<br/>domain · Zod"]
+    annotations["Annotations<br/>this repository"]
+    sync["Sync"]
+    ui["i18n · design tokens"]
+  end
+
+  subgraph cloud["Backend: account and sync arrive after 1.0"]
+    supabase[("Supabase<br/>Postgres + RLS · Auth")]
+    r2[("Cloudflare R2<br/>presigned URLs")]
+    powersync["PowerSync Service"]
+  end
+
+  mobile --> renderer & files & keys
+  mobile --> skia
+  mobile --> db
+  files --> pdfs
+  renderer --> pdfs
+  mobile --> shared
+  web --> shared
+  db <-.->|sync stream| powersync
+  supabase -->|logical replication| powersync
+  db -.->|upload queue| supabase
+  pdfs <-.->|upload / download| r2
+  web -.-> supabase
+
+  %% Layout only: invisible links (~~~) that stack the boxes in a narrow column, so the
+  %% diagram stays readable on a phone. They draw nothing and mean nothing.
+  keys ~~~ files
+  files ~~~ renderer
+  skia ~~~ db
+  powersync ~~~ web
+  core ~~~ annotations
+  annotations ~~~ sync
+  sync ~~~ ui
+  style annotations stroke-width:3px

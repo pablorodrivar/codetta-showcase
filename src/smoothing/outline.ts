@@ -1024,12 +1024,12 @@ export function takeCommittedChunks(builder: OutlineBuilder): number[][] {
 }
 
 /**
- * What {@link takeCommittedChunks} has not handed out: from the last taken point of each side,
- * around the end cap and back (or the whole outline while nothing has been taken).
+ * {@link tailPolygon} from parts already taken of the builder (`outlineParts(builder, …)`): the
+ * reader's pen up needs both the tail, for the live path, and the parts, for the cache, from one
+ * `outlineParts` (ADR-013 §5).
  */
-export function tailPolygon(builder: OutlineBuilder, complete: boolean): number[] {
+export function tailPolygonOf(builder: OutlineBuilder, parts: OutlineParts): number[] {
   'worklet';
-  const parts = outlineParts(builder, complete);
   if (parts.dot || builder.takenLeft === 0) return outlinePolygon(parts);
   const polygon = parts.committedLeft.slice(builder.takenLeft - 2);
   for (const value of parts.tailLeft) polygon.push(value);
@@ -1037,4 +1037,47 @@ export function tailPolygon(builder: OutlineBuilder, complete: boolean): number[
   pushReversed(polygon, parts.tailRight, 0);
   pushReversed(polygon, parts.committedRight, builder.takenRight - 2);
   return polygon;
+}
+
+/**
+ * What {@link takeCommittedChunks} has not handed out: from the last taken point of each side,
+ * around the end cap and back (or the whole outline while nothing has been taken).
+ */
+export function tailPolygon(builder: OutlineBuilder, complete: boolean): number[] {
+  'worklet';
+  return tailPolygonOf(builder, outlineParts(builder, complete));
+}
+
+/**
+ * Outline parts packed in one `Float64Array`, to hand them from the UI runtime to the JS thread
+ * at pen up in one copy (ADR-008 §7: the polygon is not assembled on the UI runtime). The
+ * first {@link PACKED_HEADER} values are the lengths of committed left, committed right, tail
+ * left, tail right, start cap, end cap and dot (−1 without a dot), then the values in that order.
+ * Float64, so the polygon assembled from it is the same bit for bit.
+ */
+export const PACKED_HEADER = 7;
+
+export function packOutlineParts(parts: OutlineParts): Float64Array {
+  'worklet';
+  const sections = [
+    parts.committedLeft,
+    parts.committedRight,
+    parts.tailLeft,
+    parts.tailRight,
+    parts.startCap,
+    parts.endCap,
+    parts.dot ?? [],
+  ];
+  let total = PACKED_HEADER;
+  for (const section of sections) total += section.length;
+  const packed = new Float64Array(total);
+  for (let index = 0; index < 6; index++) packed[index] = sections[index]?.length ?? 0;
+  packed[6] = parts.dot ? parts.dot.length : -1;
+  let offset = PACKED_HEADER;
+  for (const section of sections) {
+    // A native copy (`TypedArray.prototype.set`), also in Hermes: no JS loop over the stroke.
+    packed.set(section, offset);
+    offset += section.length;
+  }
+  return packed;
 }
