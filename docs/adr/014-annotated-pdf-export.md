@@ -2,7 +2,7 @@
 
 > Condensed English version of ADR-014. The full record, in Spanish, is in the private repository.
 
-**Status: accepted (decided 15 Nov 2026): the export uses an incremental update (Option B); pdf-lib (Option A) is discarded.** What is still to be verified no longer decides the technique, only whether the export ships in 1.0 or moves to 1.1. Two of the shipping conditions are already met on the emulator (memory of the incremental update alone, and Acrobat Reader); macOS Preview, PDFKit and a real device are pending. §1–§6 describe Option A and stay as a record; each says what still applies to the incremental update.
+**Status: accepted (decided 15 Nov 2026): the export uses an incremental update (Option B); pdf-lib (Option A) is discarded.** What is still to be verified no longer decides the technique, only whether the export ships in 1.0 or moves to 1.1. Two of the shipping conditions are already met on the emulator (memory of the incremental update alone, and Acrobat Reader); macOS Preview, PDFKit and a real device are pending. **The export in the app** (the library's entry, the progress sheet, the native copy and sharing) was written on 20 Nov 2026 and awaits its first build and test on the emulator (The export in the app). §1–§6 describe Option A and stay as a record; each says what still applies to the incremental update.
 
 **Where the code lives.** This repository contains the annotation engine, `@codetta/annotations`. Its `src/pdf/` holds the pdf-lib export (`annotate-pdf.ts`, Option A) and the page-content operators (`content.ts`, exported as `@codetta/annotations/pdf/content`), which both options use; `src/bench/pdf-export.ts` and `pnpm pdf-report` hold the benchmark. **The incremental update writer (PDF lexer, xref reader, incremental writer, flate) lives in the app's core package, in the private repository;** its measurements are reported here.
 
@@ -28,7 +28,7 @@ They come from the criteria below: "if it meets the criteria and Acrobat, Previe
 | **Acrobat Reader**, the four sample files | Emulator round, desktop Acrobat | All four open without warnings, without asking to save on close, with the annotations on screen and in print preview | **Pass:** all four |
 | **macOS Preview and PDFKit** | Mac | As Acrobat; Preview may rewrite the file on save, but not on open | Pending (Mac) |
 | **Real Android tablet or iPad** | Device, release measuring build | Criteria 1 to 3 with device figures | Pending (Mac) |
-| **Criterion 1 with the incremental update** (19-page score fully annotated in ≤ 10 s) | **Not measured:** no benchmark runs it. 50 pages of the book take about 13 s on the emulator, so 19 should stay below, but there is no figure | ≤ 10 s | Pending (remaining export work) |
+| **Criterion 1 with the incremental update** (19-page score fully annotated in ≤ 10 s) | **Not measured:** no benchmark runs it. 50 pages of the book take about 13 s on the emulator, so 19 should stay below, but there is no figure | ≤ 10 s | Pending: measured with the app's export and its log line on the emulator |
 
 **Memory threshold: increase ≤ 150 MB over baseline,** measured as PSS on Android and `phys_footprint` on iOS:
 - **The iPad Air 4 (4 GB) limit:** jetsam kills a foreground app around 2 GB. That is the published figure for 4 GB devices, unverified on ours; on iOS the probe reports the minimum of `os_proc_available_memory()`.
@@ -98,7 +98,7 @@ These are the second run, with a corrected benchmark (the first counted a collec
 
 ## Option A: pdf-lib (§1–§6), discarded
 
-This describes Option A as measured. **Still valid for the incremental update:** the operators of §2 (`pdfPageContent`, `@codetta/annotations/pdf/content`, used without pdf-lib), the compression options of §3 (the incremental update uses fflate at level 1), the error reasons of §5 and the benchmark of §6. pdf-lib and `annotatePdf` stay in this package for the benchmark and the tests; the remaining export work removes the pdf-lib case from the app's measuring screen.
+This describes Option A as measured. **Still valid for the incremental update:** the operators of §2 (`pdfPageContent`, `@codetta/annotations/pdf/content`, used without pdf-lib), the compression options of §3 (the incremental update uses fflate at level 1), the error reasons of §5 and the benchmark of §6. pdf-lib and `annotatePdf` stay in this package, with their test and `pdf-report`. The app's measuring screen no longer runs the pdf-lib cases (20 Nov 2026); they still run in Node.
 
 ### §1. pdf-lib 1.17.1, in JS, in a separate entry point
 
@@ -235,25 +235,51 @@ With the whole book (criterion 2): ≈ 74 s estimated on Hermes against ≈ 2.2 
 - **With 50 pages, what remains is drawing and compressing** (about 80 ms per page in `--jitless`), the same as with pdf-lib. Native compression (§3) would help here too. **No memory peak:** only the annotated pages' objects and what is appended. pdf-lib holds the input, the objects and the output at once.
 - **Bundle size:** about 3 KB minified on top of the metadata reader the app already ships, plus the operators (about 35 KB, mostly Bravura outlines), against pdf-lib's +754 KB of bytecode. To be confirmed with `expo export`.
 
+## The export in the app (20 Nov 2026)
+
+Written once the library's action menu existed; the Android code is built and tested on the emulator before it ships, and the iOS code waits for a Mac.
+
+- **The entry point:** "Export annotated PDF" in each card's and row's overflow menu and as a screen reader action, from the library's one list of score actions. Not long press, which selects.
+- **The run** (in the app's core package, pure and tested in Node): the heads of every page of the score, keeping the live annotations of live, visible layers, as the reader does; per annotated page, its rows, a `PageJob` in 40 ms chunks that yield without waiting for a frame, the reader's draw order, and the incremental update with each content stream compressed in 64 KiB pieces that also yield. "Page x of n" counts every page of the score, annotated or not. The original is read through `readRange`.
+- **The copy:** native code copies the stored PDF to the cache and appends the update (a `Uint8Array`, no base64), writing a `.part` that becomes the `.pdf` only after `fsync`, so a cancelled or failed export leaves no half file. The file is named "Composer - Title (annotated)", with the suffix translated and the title cut first when it is long (to 100 characters and 200 UTF-8 bytes). Then the system share sheet (`expo-sharing`), only with the app in the foreground: Android does not let a background app start the share activity.
+- **No visible annotations** (none, or all on hidden layers): the original PDF is shared, without the update, under the name without the suffix, and the library's status line says so, adding that annotations on hidden layers are not exported when there are some. The native code tries a hard link to the stored file and copies it if that fails. **On Android it always copies:** on Android 15, SELinux denies `link()` to apps (`avc: denied { link } … untrusted_app`), which is accepted for 1.0; the alternative for 1.1 is the app's own `ContentProvider` serving the stored PDF under the user's name without a copy. On iOS the link is used (untested until a Mac is available). The receiving app only gets read access. **Invariant:** nothing ever writes into a file that already exists in the export folder, since it may be a hard link to the stored PDF. The temporary file is always new (its own inode), the rename is atomic, and anything already at the target is unlinked first, never overwritten in place. A JVM test checks that the stored PDF keeps its SHA-256 after an annotated export while the earlier link is still there.
+- **What is deleted, and when:** a new export deletes the earlier ones **except the newest finished one**, and the folder is emptied **when the app starts**. Emptying it at every export could delete a PDF another app is still reading: on Android the share sheet hands Drive or the mail app a `content://` URI to the file, and they may read it after the sheet closes. Keeping only the newest covers that, keeps at most two copies in the cache, and needs no signal that the other app is done (Android gives none).
+- **In the background** the export goes on when the app comes back, without losing what was done: everything is in JS memory. If the system kills the process, the next start empties the folder.
+- **The progress sheet:** "Page x of n" and a bar with `accessibilityRole="progressbar"` and its value, read aloud at each 10 % or every 5 s and never twice within 1.5 s; Cancel (a tap outside does not cancel); the reason when it cannot be done (protected, damaged, missing PDF, no space); and the `replacedCharacters` notice in the library's status line. The data ZIP as a way out comes with the data export.
+- **The log line** carries numbers only (times, bytes, pages, the longest frame), never a title, a composer or a path with the file name; warnings carry the error's kind, not its message.
+- **Sharing out, not in:** only `shareAsync` is used. The sharing package's config plugin, which would rewrite incoming share intents, is not added, so opening PDFs in the app from other apps is unchanged.
+
+**Measured in Node** (the incremental update alone, every page of the 342-page book annotated; the last column is the app's code, with chunked compression):
+
+| `node --jitless` | In one go | 8 ms chunks, next frame | 40 ms chunks, no frame wait | 40 ms chunks and chunked compression (the app) |
+| --- | --- | --- | --- | --- |
+| Total | 21.9 s | 33.2 s | 23.9 s | 23.7 s |
+| Longest JS block | 100 ms | 97 ms | 112 ms | 98 ms |
+| … drawing and compressing a page, longest | 77 ms | 93 ms | 79 ms | 72 ms |
+
+Chunked compression shortens the page's drawing stretch only by about 10 %: what remains is writing the operators and turning them into bytes. Writing the operators in groups of annotations waits for the Hermes figures of the first cold export.
+
+### First test on the emulator (21 Nov 2026)
+
+The export works end to end, and Acrobat and the Windows viewer open the results without warnings, with the annotations in place and in print preview. With the 342-page book fully annotated in a release build: **34–40 s in total and +117 MB of memory** (criterion 2 passes), but **the longest frame was 1.3–2.9 s** (criterion 3, ≤ 1 s, fails; 267–341 ms with the Bach). It follows neither the native copy nor the preparation. The log line now records the stages the longest frame spans (database queries, PDF work, native reads, preparation, the hand-over to native code), when it ended, and Hermes' garbage-collection counters, so the next run can tell the JS thread from the emulator's GPU.
+
 ## What is left
 
-The remaining export work starts once the library's action menu exists, since the action lives there. It brings:
-- **the native part:** copy the PDF to the cache and append the bytes (with `Uint8Array`, no base64), share it with `expo-sharing`, and read the original through `readRange` as a `PdfByteSource`, which splits large reads because the xref table is read in one go (up to 32 MiB) and `readRange` has a per-call cap (`maxReadBytes`); plus preparation in 30–50 ms chunks and chunked compression;
-- **the progress sheet:** "Page x of n", `accessibilityRole="progressbar"` with its value, a live region that does not announce every page, Cancel, the errors of §5 and the `replacedCharacters` warning, in Spanish, English, Dutch and German;
-- **the entry point:** the overflow menu of the library card and row, and an "Export annotated PDF" accessibility action (not long press, which the library uses for selection); and removing the pdf-lib case from the measuring screen;
-- **highlighters with one layer per ink (ADR-008 §4), a requirement:** per ink and page, a transparency group (a Form XObject with `/Group << /S /Transparency >>` holding that ink's strokes opaque), drawn with `Do` under an `ExtGState` with its alpha (`/ca`), inks in order of first appearance, like `highlightGroups`, checked with the readers of the compatibility table by comparing one-ink and two-ink crossings with the app. The layers that go in are the visible ones, as in the reader.
-- **Also:** more real PDFs (public-domain libraries, publishers, scans from other tools) with testers; Preview, PDFKit and a real tablet or iPad; and whether the native `readRange` serves concurrent reads (if it queues them, reading children 32 at a time gains less than in the benchmark, where all resolve in the same turn).
+- **The long frame of criterion 3:** measured with the stage of the log line, the full `logcat`, `dumpsys gfxinfo framestats` and a run with the emulator's software GPU, then fixed where it falls; and whether the native `readRange` serves concurrent reads (if it queues them, reading children 32 at a time gains less than in the benchmark).
+- **Sharing the original without a copy on Android:** the app's own `ContentProvider` (1.1).
+- **Highlighters with one layer per ink (ADR-008 §4), a requirement:** per ink and page, a transparency group (a Form XObject with `/Group << /S /Transparency >>` holding that ink's strokes opaque), drawn with `Do` under an `ExtGState` with its alpha (`/ca`), inks in order of first appearance, like `highlightGroups`, checked with the readers of the compatibility table by comparing one-ink and two-ink crossings with the app.
+- **Also:** more real PDFs (public-domain libraries, publishers, scans from other tools) with testers; Preview, PDFKit, the iOS export and a real tablet or iPad; and writing the operators in groups if the Hermes figures ask for it.
 
 ## Consequences
 
 - **The same frame:** `framePdfPage` reads boxes and `/Rotate` like pdf.js, and a test checks that each mark lands where `normalizedToPdf` says. The iOS MediaBox fix of the native renderer is still needed for screen and export to match on iOS.
 - **Stamps identical to the screen:** their outlines come from the same Bravura. If the stamp catalogue or the font changes, a test asks to regenerate them. **Text differs from the screen:** it is Helvetica (§2).
-- **Requested from the library:** the export joins the library's list of score actions, marked as presenting a system sheet (on iOS it waits for the menu to close), without touching the grid or the list.
+- **Requested from the library:** the export is in the library's list of score actions, marked as presenting a sheet of its own and then the system's (on iOS it waits for the menu to close), without touching the grid or the list.
 - **The inks of the Normal appearance,** even when reading in Paper or Night: the PDF is for printing.
 
 ## Risks
 
 - **pdf-lib is unmaintained:** the latest version, 1.17.1, dates from November 2021, with no npm release since. It was one reason to discard it; the incremental update depends neither on it nor on its forks. Only the benchmark and the tests use it.
 - **Memory on Hermes:** the incremental update never holds input and output at once. Measured alone on the emulator: 99–112 MB over baseline, under the 150 MB threshold. The iPad (`phys_footprint`) is still to be measured.
-- **PDFs the core reader misreads** (broken xref tables) return `unreadable`. pdf-lib rebuilt some and the incremental update does not: the UI then offers the data ZIP, and the import fixtures and real PDFs are tested.
+- **PDFs the core reader misreads** (broken xref tables) return `unreadable`. pdf-lib rebuilt some and the incremental update does not: the sheet gives the reason (the data ZIP as a way out comes with the data export), and the import fixtures and real PDFs are tested.
 - **Export and screen must match:** checked with `pdftoppm` (Poppler) and with an operator interpreter in the tests. Opening it in the iOS and Android system viewers is still to be done.

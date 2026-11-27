@@ -79,6 +79,7 @@ export {
   type HitTestOptions,
   segmentDistance2,
 } from './hit-test/eraser';
+export { FinishedStrokeJob, type FreehandAnnotation } from './page/finished-stroke-job';
 export { pageFromCache, PageJob, POINTS_PER_STEP, type RowRef } from './page/page-job';
 export {
   type PreparationTimings,
@@ -180,7 +181,10 @@ export {
   type OutlineParts,
   outlineParts,
   outlinePolygon,
+  PACKED_HEADER,
+  packOutlineParts,
   tailPolygon,
+  tailPolygonOf,
   takeCommittedChunks,
 } from './smoothing/outline';
 export {
@@ -188,6 +192,7 @@ export {
   capturedPoints,
   createStrokeCapture,
   finishStroke,
+  finishStrokeParts,
   freehandOutline,
   type FreehandStyle,
   MIN_SAMPLE_DISTANCE,

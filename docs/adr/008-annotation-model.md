@@ -189,6 +189,8 @@ Why, from the figures above:
 
 **On pen-up the outline is not recomputed** (19 ms on the UI runtime for 2000 points, more than a frame; 6.9 ms on the JS thread). The live outline is reused: the committed chunks (`takeCommittedChunks`) plus the final tail (`tailPolygon(builder, true)`, via `outlineParts`). Its cost depends on the tail, not the stroke length, and the figure equals the full outline (§4). If a recompute is ever needed (say, a width change), it is chunked or deferred while a page turn is pending, never on the UI thread.
 
+**Not assembling the polygon on the UI runtime either:** `finishStrokeParts` gives the points, the outline's parts packed in a `Float64Array` (`packOutlineParts`, native copies) and the tail the live path still lacks, from one `outlineParts` call; `FinishedStrokeJob` assembles the polygon (bit for bit `outlinePolygon` and `freehandOutline`) and the eraser box on the JS thread, a few points per step. Bench cases: `finish-stroke-2000` (the whole polygon, reference), `finish-parts-2000` (carries the 2 ms budget) and `finished-stroke-job-2000` (reference: the reader runs it in slices). In V8 (Node 22, median of three runs), p50 / p95: 0.052 / 0.086 ms, 0.054 / 0.090 ms and 0.15 / 0.43 ms: the first two cost the same there. The advantage on the UI runtime, with the copy between runtimes, is to be confirmed in Hermes; without it, the reader goes back to `finishStroke`.
+
 #### Two-phase, chunked reading
 
 Implemented for the reader (ADR-013 §4 and §5):
@@ -242,6 +244,8 @@ To approximate a slower machine, `PageJob` was given a clock multiplied by 6 (it
 
 **If the collector turns out to set the chunk p95 on device:** store the cached outline as a `Float32Array` (the only change that removes real bytes, as the polygon is half of what remains; it changes what the reader reads); or raise the reserve to the typical pause, at the cost of shorter chunks. `PageJob` accepts the reserve as an option (`reserveMs`; default `CHUNK_RESERVE_MS`), and the bench has `page-job-chunk-reserve-3` and `page-job-chunk-long-page-reserve-3` (3 ms reserve: chunks end near 5 ms instead of 6.5, and the page needs 17 chunks instead of 14, +21 %). The reader does not pass it yet.
 
+**Measured on the emulator on 20/11/2026** (the app's PC session, a release measurement build). **The chunk budget fails because of the collector:** in the reader, preparation chunks had a p95 of 8.3–9.6 ms (8.5 ms with the 3 ms reserve); in `dev-perf`, `page-job-chunk` had a p95 of 8.0–13 ms, and 6.5–7.2 ms with the 3 ms reserve, which passes; `page-gc-count` had a p50 of 10–11 collections per page and `page-gc-pause` a p50 of 4.2–5.3 ms. The 3 ms reserve costs time: the 300-stroke page goes from 2.1 to 2.3 s and the long-stroke page from 1.5 to 2.3 s (+52 %). The reserve stays at its default until the reader's own figures decide it; collections within the page turn are follow-up work (ADR-013).
+
 #### Exporting the annotated PDF
 
 Android emulator figures (release build, Hermes, x86_64 Pixel Tablet on a PC), not from an ARM tablet or the iPad; absolute numbers may be inflated by emulator variance, but the two techniques were compared in the same round. Details and decision in ADR-014:
@@ -250,6 +254,8 @@ Android emulator figures (release build, Hermes, x86_64 Pixel Tablet on a PC), n
 - **Memory:** not yet measured per technique (about 850 MB PSS mixing both).
 
 The export prepares each page with `PageJob` in 30–50 ms chunks that do not wait for the frame, not with the page-turn budget: a progress sheet has no page turn to protect, and waiting for frames lengthens the export (ADR-014). `pnpm pdf-report` measures it in Node.
+
+**The §7 cases in the store build (24/11/2026).** The Diagnostics screen (ADR-013 §10) runs `runBench` and the UI-runtime cases of `@codetta/annotations/bench` in the store build too, so testers can share their figures. It is the one exception to "the bench is for scripts and development screens": a single app file imports it (its own lint block), and the screen loads it with `import()` when the tests are requested, not at start-up. It adds about 19 KB to the Android JS (0.3 % of the bundle; all of Diagnostics adds about 91 KB). perfect-freehand (a devDependency used only for the `perf-report` comparison) and the annotated-PDF cases (pdf-lib) stay out, and a script checks the real bundles for them.
 
 ### 8. Database
 
@@ -296,7 +302,7 @@ The web test reader is this package's test bench in Chrome: pdf.js with the anno
 - **Real captures:** measurements are synthetic today; the development screen will record real strokes in the `fixtures/strokes/` format.
 - **Ink mapping for Paper and Night:** still pending in the design tokens.
 - **SMuFL stamp and text sizes:** resolved; `STAMP_EM_PER_BOX` (2.5 stamp boxes per em, glyph ink box centred on the point) and `TEXT_LINE_HEIGHT` (1.3, with Inter) live in `src/geometry/text-and-stamps.ts`, used by the web test reader and the eraser (stamps erase by their box, `STAMP_BASE_SIZE`); the mobile reader adopts them next.
-- **Licence notices:** the app must show third-party licences, including perfect-freehand (MIT) for the derived code.
+- **Licence notices:** the app's third-party licence list includes perfect-freehand (MIT) for the derived code, and a test requires an entry for every file that says it is derived from third-party code. The About screen that shows it comes later.
 
 ## Consequences
 

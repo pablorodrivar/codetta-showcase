@@ -33,6 +33,7 @@ describe('bench cases', () => {
       ['live-4000', 0.5],
       ['live-10000', 0.5],
       ['outline-2000', 2],
+      ['finish-parts-2000', 2],
       ['page-cached', 30],
       ['page-job-chunk', 8],
       ['page-job-chunk-long', 8],

@@ -5,13 +5,19 @@
 import { decodePoints, encodePoints } from '../codec/points-codec';
 import { OUTLINE_SCALE } from '../geometry/page-frame';
 import { eraseHits, type HitTarget } from '../hit-test/eraser';
+import { FinishedStrokeJob, type FreehandAnnotation } from '../page/finished-stroke-job';
 import { pageFromCache, PageJob } from '../page/page-job';
 import { PreparedCache, preparePage } from '../page/prepare-page';
 import { POINT_STRIDE, type PointBuffer } from '../points';
 import { encodeAnnotationData } from '../schema/rows';
-import { outlineOptions } from '../smoothing/stroke';
+import {
+  addSample,
+  createStrokeCapture,
+  finishStrokeParts,
+  outlineOptions,
+} from '../smoothing/stroke';
 import { busyPageStrokes, longStroke } from '../test/synthetic-strokes';
-import { finishedOutlineSamples, liveEventSamples } from './live';
+import { finishedOutlineSamples, finishSamples, liveEventSamples } from './live';
 
 /** A4 page: height over width. */
 export const BENCH_ASPECT = 297 / 210;
@@ -26,6 +32,9 @@ export type BenchId =
   | 'outline-10000'
   | 'decode-2000'
   | 'decode-10000'
+  | 'finish-stroke-2000'
+  | 'finish-parts-2000'
+  | 'finished-stroke-job-2000'
   | 'page'
   | 'page-read'
   | 'page-outlines'
@@ -113,6 +122,30 @@ export const BENCH_CASES: readonly BenchCase[] = [
     id: 'decode-10000',
     label: 'Decode, 10000 pts',
     adr: 'Decode 10,000 points',
+    budgetMs: null,
+    worklet: false,
+  },
+  {
+    id: 'finish-stroke-2000',
+    label: 'Pen up, whole polygon (finishStroke), 2000-pt stroke drawn live',
+    adr: 'Pen up with the whole polygon (`finishStroke`), 2,000-point stroke drawn live',
+    // Reference: what the reader no longer does on the UI runtime (ADR-008 §7).
+    budgetMs: null,
+    worklet: true,
+  },
+  {
+    id: 'finish-parts-2000',
+    label: 'Pen up, packed parts and tail (finishStrokeParts), 2000-pt stroke drawn live',
+    adr: 'Pen up with the packed parts and the tail (`finishStrokeParts`), 2,000-point stroke drawn live',
+    // The budget ADR-008 §7 proposed for pen up taken from the live outline.
+    budgetMs: 2,
+    worklet: true,
+  },
+  {
+    id: 'finished-stroke-job-2000',
+    label: 'The cache entry of that stroke on the JS thread (FinishedStrokeJob), whole',
+    adr: 'The cache entry of that stroke on the JS thread (`FinishedStrokeJob`), whole',
+    // Reference: it goes in scheduler slices, not in one go.
     budgetMs: null,
     worklet: false,
   },
@@ -371,6 +404,45 @@ export interface RunOptions {
   readonly naiveLiveSamples?: () => number[];
 }
 
+/**
+ * What the reader has at pen up for a stroke drawn live: its annotation, with the points as
+ * captured, and the packed outline parts (`finishStrokeParts`).
+ */
+export function finishedStrokeInput(points: readonly number[]): {
+  readonly annotation: FreehandAnnotation;
+  readonly parts: Float64Array;
+} {
+  const capture = createStrokeCapture(BENCH_STYLE, BENCH_ASPECT);
+  for (let offset = 0; offset + POINT_STRIDE <= points.length; offset += POINT_STRIDE) {
+    addSample(
+      capture,
+      points[offset] ?? 0,
+      points[offset + 1] ?? 0,
+      points[offset + 2] ?? 0,
+      points[offset + 3] ?? 0,
+    );
+  }
+  const finished = finishStrokeParts(capture);
+  if (!finished) throw new Error('The bench stroke has no points');
+  const id = '019a7a2e-1c2d-7e3f-8a4b-5c6d7e8f9a0c';
+  return {
+    annotation: {
+      id,
+      owner_id: id,
+      score_id: id,
+      layer_id: id,
+      page_index: 0,
+      z: 0,
+      created_at: '2026-11-27T00:00:00.000Z',
+      updated_at: '2026-11-27T00:00:00.000Z',
+      deleted_at: null,
+      type: 'stroke',
+      data: { v: 1, ink: 'red', width: BENCH_STYLE.width, input: 'pen', points: finished.points },
+    },
+    parts: finished.parts,
+  };
+}
+
 /** One stored stroke of `count` points, as the local SQLite returns it. */
 function longStrokeRow(count: number): string {
   const [first] = busyPageRows(1);
@@ -519,6 +591,41 @@ export async function runBench(options: RunOptions = {}): Promise<BenchRow[]> {
       benchRow(
         decodeId,
         time(() => decodePoints(encoded), DECODE_REPEAT),
+      ),
+    );
+  }
+
+  for (const [id, which] of [
+    ['finish-stroke-2000', 'polygon'],
+    ['finish-parts-2000', 'parts'],
+  ] as const) {
+    await step(id);
+    rows.push(
+      benchRow(
+        id,
+        finishSamples(
+          BENCH_STYLE,
+          inputs.outline['outline-2000'],
+          BENCH_ASPECT,
+          which,
+          WARMUP,
+          OUTLINE_REPEAT,
+        ),
+      ),
+    );
+  }
+
+  await step('finished-stroke-job-2000');
+  {
+    const { annotation, parts } = finishedStrokeInput(inputs.outline['outline-2000']);
+    rows.push(
+      benchRow(
+        'finished-stroke-job-2000',
+        time(() => {
+          new FinishedStrokeJob(annotation, parts, BENCH_ASPECT, {
+            cache: new PreparedCache(),
+          }).run({ outOfTime: () => false });
+        }, OUTLINE_REPEAT),
       ),
     );
   }
